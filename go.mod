@@ -1,13 +1,11 @@
-module github.com/karalabe/go-bluesky
+module github.com/TweetShift/go-bluesky
 
 go 1.20
 
 require (
 	github.com/bluesky-social/indigo v0.0.0-20230504025040-8915cccc3319
 	github.com/golang-jwt/jwt/v5 v5.0.0
-)
 
-require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect

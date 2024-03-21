@@ -42,6 +42,9 @@ var (
 	// ErrSessionExpired is returned from any API call if the underlying session
 	// has expired and a new login from scratch is required.
 	ErrSessionExpired = errors.New("session expired")
+
+	// ErrInvalidToken is returned when the JWT token can not be parsed
+	ErrInvalidToken = errors.New("invalid token")
 )
 
 // Client is an API client attached to (and authenticated to) a Bluesky PDS instance.
@@ -86,18 +89,24 @@ func DialWithClient(ctx context.Context, server string, client *http.Client) (*C
 // be detected and rejected. For your security, this library will refuse to use
 // your master credentials.
 func (c *Client) Login(ctx context.Context, handle string, appkey string) error {
+	c.client.Auth = &xrpc.AuthInfo{Handle: handle}
 	// Authenticate to the Bluesky server
-	sess, err := atproto.ServerCreateSession(ctx, c.client, &atproto.ServerCreateSession_Input{
-		Identifier: handle,
-		Password:   appkey,
-	})
+	sess, err := atproto.ServerCreateSession(ctx, c.client,
+		&atproto.ServerCreateSession_Input{
+			Identifier: handle,
+			Password:   appkey,
+		})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrLoginUnauthorized, err)
 	}
 	// Verify and reject master credentials, sorry, no bad security practices
 	token, _, err := jwt.NewParser().ParseUnverified(sess.AccessJwt, jwt.MapClaims{})
-	if err != nil {
-		return err
+	// Ignore parser error
+	//if err != nil {
+	//	return err
+	//}
+	if token == nil {
+		return ErrInvalidToken
 	}
 	if token.Claims.(jwt.MapClaims)["scope"] != "com.atproto.appPass" {
 		return fmt.Errorf("%w: %w", ErrLoginUnauthorized, ErrMasterCredentials)
@@ -107,8 +116,12 @@ func (c *Client) Login(ctx context.Context, handle string, appkey string) error 
 	if err != nil {
 		return err
 	}
-	if token, _, err = jwt.NewParser().ParseUnverified(sess.RefreshJwt, jwt.MapClaims{}); err != nil {
-		return err
+	token, _, err = jwt.NewParser().ParseUnverified(sess.RefreshJwt, jwt.MapClaims{})
+	//if err != nil {
+	//	return err
+	//}
+	if token == nil {
+		return ErrInvalidToken
 	}
 	refresh, err := token.Claims.GetExpirationTime()
 	if err != nil {
